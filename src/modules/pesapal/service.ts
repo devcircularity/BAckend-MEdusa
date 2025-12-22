@@ -15,8 +15,10 @@ import {
   UpdatePaymentOutput,
   DeletePaymentInput,
   DeletePaymentOutput,
-  PaymentContext,
-  PaymentSessionData
+  GetPaymentStatusInput,
+  GetPaymentStatusOutput,
+  WebhookActionResult,
+  PaymentActions
 } from "@medusajs/framework/types"
 import axios from "axios"
 
@@ -187,25 +189,27 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
     }
   }
 
-  // Required implementation for AbstractPaymentProvider
-  async getPaymentStatus(data: Record<string, unknown>): Promise<string> {
+  // FIXED: Correct return type
+  async getPaymentStatus(input: GetPaymentStatusInput): Promise<GetPaymentStatusOutput> {
+    const data = input.data || {}
+    
     if (data?.order_tracking_id) {
       try {
         const status = await this.getTransactionStatus(data.order_tracking_id as string)
         
         if (status.payment_status_description === "Completed") {
-          return "authorized"
+          return { status: "authorized" }
         }
         
         if (status.payment_status_description === "Failed") {
-          return "error"
+          return { status: "error" }
         }
       } catch (error) {
         console.error("Error getting payment status:", error)
       }
     }
     
-    return "pending"
+    return { status: "pending" }
   }
 
   // Required implementation for AbstractPaymentProvider
@@ -214,12 +218,20 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
     return paymentData
   }
 
-  // Required implementation for AbstractPaymentProvider
-  async getWebhookActionAndData(webookData: Record<string, unknown>): Promise<{ action: string; contentType: string; data: Record<string, unknown> }> {
+  // FIXED: Correct return type with PaymentActions
+  async getWebhookActionAndData(input: { 
+    data: Record<string, unknown>
+    rawData: string | Buffer
+    headers: Record<string, unknown>
+  }): Promise<WebhookActionResult> {
+    const data = input.data as any
+    
     return {
-      action: "pesapal",
-      contentType: "json",
-      data: webookData
+      action: "authorized" as PaymentActions,
+      data: {
+        session_id: data.order_tracking_id || data.merchant_reference || "unknown",
+        amount: data.amount || 0
+      }
     }
   }
 
@@ -240,8 +252,10 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
       // Generate unique order ID
       const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`
       
-      // Format customer data safely
-      const customerContext = context?.customer || {}
+      // FIXED: Safely access customer data with proper type casting
+      const contextData = context as any || {}
+      const customer = contextData.customer || {}
+      const billingAddress = contextData.billing_address || {}
       
       const payload = {
         id: orderId,
@@ -251,18 +265,18 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
         callback_url: this.options.callback_url,
         notification_id: this.ipnId,
         billing_address: {
-          email_address: customerContext.email || "customer@example.com",
-          phone_number: customerContext.phone || "",
-          country_code: "KE", // Default to Kenya, should be dynamic
-          first_name: customerContext.first_name || "Customer",
+          email_address: customer.email || contextData.email || "customer@example.com",
+          phone_number: customer.phone || billingAddress.phone || "",
+          country_code: billingAddress.country_code || "KE",
+          first_name: customer.first_name || billingAddress.first_name || "Customer",
           middle_name: "",
-          last_name: customerContext.last_name || "",
-          line_1: customerContext.billing_address?.address_1 || "",
-          line_2: customerContext.billing_address?.address_2 || "",
-          city: customerContext.billing_address?.city || "",
-          state: customerContext.billing_address?.province || "",
-          postal_code: customerContext.billing_address?.postal_code || "",
-          zip_code: customerContext.billing_address?.postal_code || ""
+          last_name: customer.last_name || billingAddress.last_name || "",
+          line_1: billingAddress.address_1 || "",
+          line_2: billingAddress.address_2 || "",
+          city: billingAddress.city || "",
+          state: billingAddress.province || "",
+          postal_code: billingAddress.postal_code || "",
+          zip_code: billingAddress.postal_code || ""
         }
       }
       
@@ -293,8 +307,9 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
       console.error("Error initiating Pesapal payment:", error.response?.data || error.message)
       
       // Return a fallback for testing
+      const fallbackId = `pesapal_${Date.now()}`
       return {
-        id: `pesapal_${Date.now()}`,
+        id: fallbackId,
         data: {
           amount: input.amount,
           currency_code: input.currency_code,
@@ -401,7 +416,9 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
   async updatePayment(
     input: UpdatePaymentInput
   ): Promise<UpdatePaymentOutput> {
-    return input.data || {}
+    return {
+      data: input.data || {}
+    }
   }
 
   async deletePayment(
@@ -409,7 +426,7 @@ class PesapalProviderService extends AbstractPaymentProvider<PesapalOptions> {
   ): Promise<DeletePaymentOutput> {
     return {
       data: {
-        id: input.paymentId,
+        id: (input as any).payment_id || "deleted",
         deleted: true
       }
     }
