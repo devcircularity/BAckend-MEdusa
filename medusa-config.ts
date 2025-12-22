@@ -16,19 +16,16 @@ module.exports = defineConfig({
   },
   modules: [
     {
-      resolve: "@medusajs/medusa/file",
+      resolve: "@medusajs/file",
       options: {
         providers: [
           {
-            resolve: "@medusajs/medusa/file-s3",
-            id: "s3",
+            resolve: "./src/modules/payload-file",
+            id: "payload",
             options: {
-              file_url: process.env.S3_FILE_URL,
-              bucket: process.env.S3_BUCKET,
-              region: process.env.S3_REGION,
-              access_key_id: process.env.S3_ACCESS_KEY_ID,
-              secret_access_key: process.env.S3_SECRET_ACCESS_KEY,
-              endpoint: `https://s3.${process.env.S3_REGION}.amazonaws.com`
+              payloadUrl: process.env.PAYLOAD_URL || "http://localhost:3001",
+              payloadApiKey: process.env.PAYLOAD_API_KEY,
+              collection: process.env.PAYLOAD_MEDIA_COLLECTION || "media",
             },
           },
         ],
@@ -39,7 +36,7 @@ module.exports = defineConfig({
       options: {
         providers: [
           {
-            resolve: "./src/modules/pesapal",  // Changed from "src/modules/pesapal" to "./src/modules/pesapal"
+            resolve: "./src/modules/pesapal",
             id: "pesapal",
             options: {
               consumer_key: process.env.PESAPAL_CONSUMER_KEY || "",
