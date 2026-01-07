@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: daima-postgres
+    environment:
+      POSTGRES_USER: daima_medusa_user
+      POSTGRES_PASSWORD: StrongPasswordHere
+      POSTGRES_DB: daima_medusa
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daima_medusa_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - daima-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: daima-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - daima-network
+
+  medusa:
+    build: .
+    container_name: daima-medusa
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://daima_medusa_user:StrongPasswordHere@postgres:5432/daima_medusa
+      DB_NAME: daima_medusa
+      
+      # Redis
+      REDIS_URL: redis://redis:6379
+      
+      # CORS
+      STORE_CORS: ${STORE_CORS}
+      ADMIN_CORS: ${ADMIN_CORS}
+      AUTH_CORS: ${AUTH_CORS}
+      
+      # Secrets
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      
+      # Payload CMS
+      PAYLOAD_URL: ${PAYLOAD_URL}
+      PAYLOAD_API_KEY: ${PAYLOAD_API_KEY}
+      PAYLOAD_MEDIA_COLLECTION: ${PAYLOAD_MEDIA_COLLECTION}
+      
+      # Pesapal
+      PESAPAL_CONSUMER_KEY: ${PESAPAL_CONSUMER_KEY}
+      PESAPAL_CONSUMER_SECRET: ${PESAPAL_CONSUMER_SECRET}
+      PESAPAL_IPN_URL: ${PESAPAL_IPN_URL}
+      PESAPAL_CALLBACK_URL: ${PESAPAL_CALLBACK_URL}
+      
+      # Node
+      NODE_ENV: production
+      PORT: 9000
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+      - medusa_data:/app/.medusa
+    networks:
+      - daima-network
+    command: sh -c "npx medusa migrations run && npm start"
+
+volumes:
+  postgres_data:
+  medusa_data:
+
+networks:
+  daima-network:
+    driver: bridge

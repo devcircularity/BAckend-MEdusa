@@ -11,10 +11,10 @@ module.exports = defineConfig({
       authCors: process.env.AUTH_CORS!,
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
-    }
+    },
+    redisUrl: process.env.REDIS_URL, // Add this for Redis support
   },
   admin: {
-    // Add this to allow your production domain
     vite: () => ({
       server: {
         host: true,
@@ -54,7 +54,7 @@ module.exports = defineConfig({
             options: {
               consumer_key: process.env.PESAPAL_CONSUMER_KEY || "",
               consumer_secret: process.env.PESAPAL_CONSUMER_SECRET || "",
-              sandbox: process.env.NODE_ENV !== 'production', // Auto-detect sandbox mode
+              sandbox: process.env.NODE_ENV !== 'production',
               ipn_url: process.env.PESAPAL_IPN_URL || "http://localhost:9000/api/webhooks/pesapal",
               callback_url: process.env.PESAPAL_CALLBACK_URL || "http://localhost:9000/checkout/complete"
             },
